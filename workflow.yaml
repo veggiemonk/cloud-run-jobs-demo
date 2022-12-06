@@ -1,0 +1,22 @@
+main:
+  params: [event]
+  steps:
+    - init:
+        assign:
+          - project_id: ${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}
+          - location: ${sys.get_env("GOOGLE_CLOUD_LOCATION")}
+    - run_github_job:
+        call: googleapis.run.v1.namespaces.jobs.run
+        args:
+          name: ${"namespaces/" + project_id + "/jobs/github-star"}
+          location: ${location}
+          connector_params:
+            timeout: 7200
+            polling_policy:
+              initial_delay: 5
+              multiplier: 1.5
+              max_delay: 60
+        result: github_star_result
+    - return_result:
+        return:
+          ingest: github_star_result

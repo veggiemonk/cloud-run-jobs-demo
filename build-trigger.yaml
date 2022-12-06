@@ -1,0 +1,9 @@
+filename: cloudbuild.yaml
+github:
+  name: cloud-run-jobs-demo
+  owner: ${REPO_OWNER}
+  push:
+    branch: ^main$
+name: ${SERVICE_NAME}
+serviceAccount: projects/${PROJECT_ID}/serviceAccounts/${SERVICE_NAME}-build@${PROJECT_ID}.iam.gserviceaccount.com
+# CHANGE THIS TO YOUR OWN PROJECT ID

@@ -1,0 +1,17 @@
+# Ignore user created slides which are not part of the
+# example
+# slides/*
+# !slides/_samplesrc/**.go
+# !slides/README.md
+# !slides/hello.go
+# !slides/trash.go
+# !slides/sample.slide
+
+# Ignore user added assets except for 
+# sample slide images
+assets/*
+!assets/whygo
+!assets/go-img
+assets/go-img/*
+!assets/go-img/sitting_gopher.svg
+!assets/go-img/engine-gopher.jpg

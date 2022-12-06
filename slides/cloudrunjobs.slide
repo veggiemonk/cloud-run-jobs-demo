@@ -1,0 +1,84 @@
+# Cloud Run Jobs demo
+Demo batch jobs to fetch starred repositories from GitHub
+7 Dec 2022
+Tags: go, GCP, cloud run jobs
+Summary: Cloud Run Jobs demo to fetch starred repositories from GitHub
+
+
+Julien Bisconti
+
+*g.dev/julien*
+
+## Batch
+
+How many way to run batch jobs on GCP?
+
+## Demo
+
+.image ../assets/cloud-run-jobs-demo.png _ 800
+
+## Enable APIs
+
+.code ./setup/0-api.sh
+
+## Storing secrets
+
+.code ./setup/1-secret-gh-token.sh
+
+[Secret Manager console](https://console.cloud.google.com/security/secret-manager)
+
+## Build
+
+.code ./setup/2-build.sh
+
+[Cloud Build console](https://console.cloud.google.com/cloud-build/dashboard)
+
+## Deploy Jobs
+
+.code ./setup/3-run.sh
+
+[Cloud Run Jobs console](https://console.cloud.google.com/run/jobs)
+
+## Orechestrate Jobs
+
+.code ./setup/4-workflow.sh
+
+[Cloud Workflows console](https://console.cloud.google.com/workflows)
+
+## Schedule Jobs 
+
+.code ./setup/5-scheduler.sh
+
+## Result
+
+[logs](https://cloudlogging.app.goo.gl/Jy1iuhnoVQD97uSdA)
+
+[BigQuery log sink](https://console.cloud.google.com/bigquery)
+
+[dashboard](https://datastudio.google.com/u/0/navigation/reporting)
+
+.code ./assets/example.sql
+
+## Tradeoffs
+
+* number of jobs in parallel
+* job time out
+* workflow time out
+* rate limit
+* retry
+* memory
+* cpu
+* region
+* time in UTC ?
+
+## Pagination
+
+.code ./assets/page.go
+
+## Batch 
+
+.code ./assets/batch.go
+
+## Batch (cont.)
+
+.code ./assets/batch2.go
