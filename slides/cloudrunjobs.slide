@@ -17,6 +17,15 @@ How many way to run batch jobs on GCP?
 
 .image ../assets/cloud-run-jobs-demo.png _ 800
 
+## Demo (cont.)
+
+* Secret Manager to store secrets
+* Cloud Build to build container images
+* Artifact registry to store container images
+* Cloud Run Jobs to run batch jobs
+* Cloud Workflows to orchestrate batch jobs
+* Cloud Scheduler to schedule batch jobs
+
 ## Enable APIs
 
 .code ./setup/0-api.sh
@@ -82,3 +91,36 @@ How many way to run batch jobs on GCP?
 ## Batch (cont.)
 
 .code ./assets/batch2.go
+
+## Conclusion
+
+You might not need a framework
+
+Go tooling is 👌 and is a great choice for data processing
+
+Sometimes, all you need is a batch job on a schedule.
+
+## Resources
+
+* [3 ways to embed a commit hash in Go programs](https://developers.redhat.com/articles/2022/11/14/3-ways-embed-commit-hash-go-programs#)
+* [Learning Go by examples Series](https://dev.to/aurelievache/series/13751) by [Aurélie Vache](https://dev.to/aurelievache)
+* [The best Go framework](https://threedots.tech/post/best-go-framework/)
+* [Go structured logging proposal](https://go.googlesource.com/proposal/+/master/design/56345-structured-logging.md)
+* [Run bash script in Cloud Build](https://cloud.google.com/build/docs/configuring-builds/run-bash-scripts)
+* [Cloud Run container contract](https://cloud.google.com/run/docs/container-contract#env-vars)
+* [LibHunt Go](https://www.libhunt.com/l/go)
+* [OSS Insight](https://ossinsight.io/)
+
+## Interesting projects
+
+* [Golang GCP Samples](https://github.com/GoogleCloudPlatform/golang-samples/)
+* [twitter-audit-log](https://github.com/ahmetb/twitter-audit-log)
+* [Ardanlabs Service](https://github.com/ardanlabs/service)
+* [Ardanlabs Conf](https://pkg.go.dev/github.com/ardanlabs/conf/v3#section-documentation)
+* [ASCII text art generator](https://textkool.com/en/ascii-art-generator)
+* [Crontab guru](https://crontab.guru/)
+* [Excalidraw](https://excalidraw.com/)
+
+## Code & Slides
+
+github.com/veggiemonk/cloud-run-jobs-demo

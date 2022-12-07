@@ -2,9 +2,9 @@
 
 ## Downloading Starred Repositories
 
-This project is a demonstration of how to use Google Cloud Run Jobs to periodically download 
-and update a user's starred repositories from the GitHub API. 
-It includes a sample Cloud Run Job that uses the GitHub API to fetch the list of 
+This project is a demonstration of how to use Google Cloud Run Jobs to periodically download
+and update a user's starred repositories from the GitHub API.
+It includes a sample Cloud Run Job that uses the GitHub API to fetch the list of
 repositories starred by a specified user and log them in order to route those logs to a sink such as BigQuery.
 
 ## Prerequisites
@@ -49,7 +49,6 @@ gcloud config set project <your-project-id>
 gcloud config set run/region <your-preferred-region>
 ```
 
-
 > Read the `setup.sh` script to understand what is needed to run the demo.
 
 ```bash
@@ -73,6 +72,7 @@ Here is a sample of what will be deployed:
 
 ## Interesting projects
 
+* [Golang GCP Samples](https://github.com/GoogleCloudPlatform/golang-samples/)
 * [twitter-audit-log](https://github.com/ahmetb/twitter-audit-log)
 * [Ardanlabs Service](https://github.com/ardanlabs/service)
 * [Ardanlabs Conf](https://pkg.go.dev/github.com/ardanlabs/conf/v3#section-documentation)
