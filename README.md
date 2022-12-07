@@ -59,6 +59,13 @@ Here is a sample of what will be deployed:
 
 ![cloud run jobs demo on GCP](./slides/assets/cloud-run-jobs-demo.png)
 
+## Start presentation
+
+```bash
+ go get golang.org/x/tools/cmd/present # install present binary in your $GOPATH
+ make presentation
+```
+
 ## Resources
 
 * [3 ways to embed a commit hash in Go programs](https://developers.redhat.com/articles/2022/11/14/3-ways-embed-commit-hash-go-programs#)
