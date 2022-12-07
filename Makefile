@@ -58,7 +58,8 @@ test: ## Run all tests
 
 .PHONY: presentation
 presentation: ## Run golang.org/x/tools/present
-	present -base slides/ -content slides/
+	### present -base slides/ -content slides/
+	go run golang.org/x/tools/cmd/present -base slides/ -content slides/
 
 
 

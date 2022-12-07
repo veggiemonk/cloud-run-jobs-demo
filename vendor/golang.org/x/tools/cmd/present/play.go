@@ -1,4 +1,4 @@
-// Copyright 2012 The Go Authors.  All rights reserved.
+// Copyright 2012 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -18,7 +18,7 @@ import (
 	"golang.org/x/tools/playground/socket"
 	"golang.org/x/tools/present"
 
-	// This will register handlers at /compile and /share that will proxy to the
+	// This will register a handler at /compile that will proxy to the
 	// respective endpoints at play.golang.org. This allows the frontend to call
 	// these endpoints without needing cross-origin request sharing (CORS).
 	// Note that this is imported regardless of whether the endpoints are used or
@@ -26,7 +26,7 @@ import (
 	_ "golang.org/x/tools/playground"
 )
 
-var scripts = []string{"prism.js", "jquery.js", "jquery-ui.js", "playground.js", "play.js"}
+var scripts = []string{"jquery.js", "jquery-ui.js", "playground.js", "play.js"}
 
 // playScript registers an HTTP handler at /play.js that serves all the
 // scripts specified by the variable above, and appends a line that

@@ -52,12 +52,6 @@ github.com/googleapis/gax-go/v2
 github.com/googleapis/gax-go/v2/apierror
 github.com/googleapis/gax-go/v2/apierror/internal/proto
 github.com/googleapis/gax-go/v2/internal
-# github.com/soypat/go-presentx v1.1.0
-## explicit; go 1.16
-github.com/soypat/go-presentx
-# github.com/soypat/rebed v0.2.2
-## explicit; go 1.16
-github.com/soypat/rebed
 # github.com/yuin/goldmark v1.5.3
 ## explicit; go 1.18
 github.com/yuin/goldmark
@@ -131,6 +125,7 @@ golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 # golang.org/x/tools v0.4.0
 ## explicit; go 1.18
+golang.org/x/tools/cmd/present
 golang.org/x/tools/godoc/static
 golang.org/x/tools/playground
 golang.org/x/tools/playground/socket

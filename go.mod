@@ -7,9 +7,9 @@ require (
 	github.com/ardanlabs/conf/v3 v3.1.3
 	github.com/google/go-github/v48 v48.1.0
 	github.com/google/uuid v1.3.0
-	github.com/soypat/go-presentx v1.1.0
 	golang.org/x/exp v0.0.0-20221126150942-6ab00d035af9
 	golang.org/x/oauth2 v0.2.0
+	golang.org/x/tools v0.4.0
 )
 
 require (
@@ -22,14 +22,12 @@ require (
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.0 // indirect
 	github.com/googleapis/gax-go/v2 v2.7.0 // indirect
-	github.com/soypat/rebed v0.2.2 // indirect
 	github.com/yuin/goldmark v1.5.3 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	golang.org/x/crypto v0.3.0 // indirect
 	golang.org/x/net v0.3.0 // indirect
 	golang.org/x/sys v0.3.0 // indirect
 	golang.org/x/text v0.5.0 // indirect
-	golang.org/x/tools v0.4.0 // indirect
 	google.golang.org/api v0.103.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20221202195650-67e5cbc046fd // indirect

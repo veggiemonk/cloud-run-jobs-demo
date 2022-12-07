@@ -8,7 +8,7 @@ import (
 
 // makeLogger creates a logger with default settings.
 // It will print to stdout by default.
-// If the environment variable GCP_PROJECT_ID is set, it will use JSON logging.
+// If the environment variable CLOUD_RUN_JOB is set, it will use JSON logging.
 // For see structured logging proposal: https://go.googlesource.com/proposal/+/master/design/56345-structured-logging.md
 func makeLogger(defaultsAttrs ...slog.Attr) *slog.Logger {
 	h := slog.NewTextHandler(os.Stdout)

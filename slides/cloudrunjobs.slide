@@ -48,7 +48,7 @@ How many way to run batch jobs on GCP?
 
 [Cloud Run Jobs console](https://console.cloud.google.com/run/jobs)
 
-## Orechestrate Jobs
+## Orchestrate Jobs
 
 .code ./setup/4-workflow.sh
 

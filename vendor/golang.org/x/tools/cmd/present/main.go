@@ -1,11 +1,10 @@
-// Copyright 2013 The Go Authors.  All rights reserved.
+// Copyright 2013 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
 package main
 
 import (
-	"embed"
 	"flag"
 	"fmt"
 	"go/build"
@@ -16,7 +15,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/soypat/rebed"
 	"golang.org/x/tools/present"
 )
 
@@ -25,18 +23,10 @@ const basePkg = "golang.org/x/tools/cmd/present"
 var (
 	httpAddr      = flag.String("http", "127.0.0.1:3999", "HTTP service address (e.g., '127.0.0.1:3999')")
 	originHost    = flag.String("orighost", "", "host component of web origin URL (e.g., 'localhost')")
-	basePath      = flag.String("base", ".", "base path for slide template and static resources. default is current directory")
+	basePath      = flag.String("base", "", "base path for slide template and static resources")
 	contentPath   = flag.String("content", ".", "base path for presentation content")
 	usePlayground = flag.Bool("use_playground", false, "run code snippets using play.golang.org; if false, run them locally and deliver results by WebSocket transport")
 	nativeClient  = flag.Bool("nacl", false, "use Native Client environment playground (prevents non-Go code execution) when using local WebSocket transport")
-)
-
-// Embedded directories
-var (
-	//go:embed templates
-	tempFS embed.FS
-	//go:embed static
-	staticFS embed.FS
 )
 
 func main() {
@@ -69,11 +59,6 @@ func main() {
 		}
 		*basePath = p.Dir
 	}
-
-	// We attempt to create templates and static files if not present
-	rebed.Patch(tempFS, "")
-	rebed.Patch(staticFS, "")
-
 	err := initTemplates(*basePath)
 	if err != nil {
 		log.Fatalf("Failed to parse templates: %v", err)
