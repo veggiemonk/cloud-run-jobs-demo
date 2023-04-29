@@ -1,0 +1,70 @@
+substitutions:
+  _SERVICE_NAME: github-star
+  _REGION: europe-north1
+  _ARTIFACT: ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}
+options:
+  dynamic_substitutions: true
+  machineType: "E2_HIGHCPU_8"
+  logging: CLOUD_LOGGING_ONLY # needed for Cloud Build to work
+steps:
+  - id: build
+    waitFor: ["-"]
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:alpine
+#    name: 'gcr.io/cloud-builders/docker'
+    env:
+      - 'ARTIFACT=$_ARTIFACT'
+      - 'SERVICE_NAME=$_SERVICE_NAME'
+      - 'REGION=$_REGION'
+      - 'SHORT_SHA=$SHORT_SHA'
+    script: |
+      #!/usr/bin/env bash
+      set -x;
+      DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ");
+    
+      docker build \
+      --tag="${ARTIFACT}/${SERVICE_NAME}:${SHORT_SHA}" \
+      --tag="${ARTIFACT}/${SERVICE_NAME}:latest" \
+      --file=Dockerfile \
+      --build-arg="${SHORT_SHA}" \
+      --build-arg="$DATE" \
+      .
+      
+      docker push "${ARTIFACT}/${SERVICE_NAME}:${SHORT_SHA}"
+      docker push "${ARTIFACT}/${SERVICE_NAME}:latest"
+
+  - id: deploy
+    waitFor: ["build"]
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:alpine
+    env:
+      - 'ARTIFACT=$_ARTIFACT'
+      - 'SERVICE_NAME=$_SERVICE_NAME'
+      - 'REGION=$_REGION'
+      - 'PROJECT_ID=$PROJECT_ID'
+      - 'SHORT_SHA=$SHORT_SHA'
+    script: |
+      #!/usr/bin/env bash
+      set -x;
+      
+      gcloud components install beta -q;
+        
+      gcloud beta run jobs update ${SERVICE_NAME} \
+        --image ${ARTIFACT}/${SERVICE_NAME}:${SHORT_SHA} \
+        --tasks 4 \
+        --task-timeout 3600s \
+        --service-account "${SERVICE_NAME}-jobs@${PROJECT_ID}.iam.gserviceaccount.com" \
+        --memory 2Gi \
+        --cpu 2 \
+        --max-retries 2 \
+        --parallelism 2 \
+        --region ${REGION} \
+        --set-secrets GITHUB_TOKEN=${SERVICE_NAME}-token:latest \
+        --labels env=prod,app=${SERVICE_NAME},version=${SHORT_SHA};
+        
+      gcloud workflows deploy ${SERVICE_NAME}-workflow \
+        --location=${REGION} \
+        --source=workflow.yaml \
+        --service-account=${SERVICE_NAME}-workflow@${PROJECT_ID}.iam.gserviceaccount.com
+
+
+
+
