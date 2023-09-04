@@ -34,13 +34,45 @@ type Repo struct {
 	License         *github.License `json:"license"`
 }
 
+func cleanRepoFromTopic(repo *github.Repository) *Repo {
+	if repo == nil {
+		return nil
+	}
+	return &Repo{
+		FullName:        repo.GetFullName(),
+		Description:     repo.GetDescription(),
+		Homepage:        repo.GetHomepage(),
+		CreatedAt:       repo.GetCreatedAt().Time,
+		PushedAt:        repo.GetPushedAt().Time,
+		UpdatedAt:       repo.GetUpdatedAt().Time,
+		Language:        repo.GetLanguage(),
+		Fork:            repo.GetFork(),
+		ForksCount:      repo.GetForksCount(),
+		OpenIssuesCount: ptrInt(repo.OpenIssuesCount),
+		StargazersCount: ptrInt(repo.StargazersCount),
+		Size:            ptrInt(repo.Size),
+		AllowForking:    ptrBool(repo.AllowForking),
+		Topics:          repo.Topics,
+		Archived:        ptrBool(repo.Archived),
+		Disabled:        ptrBool(repo.Disabled),
+		Private:         ptrBool(repo.Private),
+		HasIssues:       ptrBool(repo.HasIssues),
+		HasWiki:         ptrBool(repo.HasWiki),
+		HasPages:        ptrBool(repo.HasPages),
+		HasProjects:     ptrBool(repo.HasProjects),
+		HasDownloads:    ptrBool(repo.HasDownloads),
+		IsTemplate:      ptrBool(repo.IsTemplate),
+		License:         repo.License,
+	}
+}
+
 func convertGhRepo(star *github.StarredRepository) *Repo {
 	r := star.GetRepository()
 	if r == nil {
 		return nil
 	}
 	return &Repo{
-		StarredAt:       star.StarredAt.Time, // UTC ??  should be modified dependeding on use case
+		StarredAt:       star.StarredAt.Time, // UTC ??  should be modified depending on use case
 		FullName:        r.GetFullName(),
 		Description:     r.GetDescription(),
 		Homepage:        r.GetHomepage(),

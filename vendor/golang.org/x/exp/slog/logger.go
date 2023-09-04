@@ -7,8 +7,11 @@ package slog
 import (
 	"context"
 	"log"
+	"runtime"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/exp/slog/internal"
 )
 
 var defaultLogger atomic.Value
@@ -22,7 +25,7 @@ func Default() *Logger { return defaultLogger.Load().(*Logger) }
 
 // SetDefault makes l the default Logger.
 // After this call, output from the log package's default Logger
-// (as with [log.Print], etc.) will be logged at InfoLevel using l's Handler.
+// (as with [log.Print], etc.) will be logged at LevelInfo using l's Handler.
 func SetDefault(l *Logger) {
 	defaultLogger.Store(l)
 	// If the default's handler is a defaultHandler, then don't use a handleWriter,
@@ -32,7 +35,8 @@ func SetDefault(l *Logger) {
 	// This can occur with SetDefault(Default()).
 	// See TestSetDefault.
 	if _, ok := l.Handler().(*defaultHandler); !ok {
-		log.SetOutput(&handlerWriter{l.Handler(), log.Flags()})
+		capturePC := log.Flags()&(log.Lshortfile|log.Llongfile) != 0
+		log.SetOutput(&handlerWriter{l.Handler(), LevelInfo, capturePC})
 		log.SetFlags(0) // we want just the log message, no time or location
 	}
 }
@@ -40,22 +44,30 @@ func SetDefault(l *Logger) {
 // handlerWriter is an io.Writer that calls a Handler.
 // It is used to link the default log.Logger to the default slog.Logger.
 type handlerWriter struct {
-	h     Handler
-	flags int
+	h         Handler
+	level     Level
+	capturePC bool
 }
 
 func (w *handlerWriter) Write(buf []byte) (int, error) {
-	var depth int
-	if w.flags&(log.Lshortfile|log.Llongfile) != 0 {
-		depth = 2
+	if !w.h.Enabled(context.Background(), w.level) {
+		return 0, nil
 	}
+	var pc uintptr
+	if !internal.IgnorePC && w.capturePC {
+		// skip [runtime.Callers, w.Write, Logger.Output, log.Print]
+		var pcs [1]uintptr
+		runtime.Callers(4, pcs[:])
+		pc = pcs[0]
+	}
+
 	// Remove final newline.
 	origLen := len(buf) // Report that the entire buf was written.
 	if len(buf) > 0 && buf[len(buf)-1] == '\n' {
 		buf = buf[:len(buf)-1]
 	}
-	r := NewRecord(time.Now(), InfoLevel, string(buf), depth, nil)
-	return origLen, w.h.Handle(r)
+	r := NewRecord(time.Now(), w.level, string(buf), pc)
+	return origLen, w.h.Handle(context.Background(), r)
 }
 
 // A Logger records structured information about each call to its
@@ -66,61 +78,69 @@ func (w *handlerWriter) Write(buf []byte) (int, error) {
 // that begins "With".
 type Logger struct {
 	handler Handler // for structured logging
-	ctx     context.Context
+}
+
+func (l *Logger) clone() *Logger {
+	c := *l
+	return &c
 }
 
 // Handler returns l's Handler.
 func (l *Logger) Handler() Handler { return l.handler }
 
-// Context returns l's context.
-func (l *Logger) Context() context.Context { return l.ctx }
-
 // With returns a new Logger that includes the given arguments, converted to
-// Attrs as in [Logger.Log]. The Attrs will be added to each output from the
-// Logger.
-//
+// Attrs as in [Logger.Log].
+// The Attrs will be added to each output from the Logger.
+// The new Logger shares the old Logger's context.
 // The new Logger's handler is the result of calling WithAttrs on the receiver's
 // handler.
 func (l *Logger) With(args ...any) *Logger {
-	var (
-		attr  Attr
-		attrs []Attr
-	)
-	for len(args) > 0 {
-		attr, args = argsToAttr(args)
-		attrs = append(attrs, attr)
-	}
-	return New(l.handler.WithAttrs(attrs))
+	c := l.clone()
+	c.handler = l.handler.WithAttrs(argsToAttrSlice(args))
+	return c
 }
 
 // WithGroup returns a new Logger that starts a group. The keys of all
 // attributes added to the Logger will be qualified by the given name.
+// (How that qualification happens depends on the [Handler.WithGroup]
+// method of the Logger's Handler.)
+// The new Logger shares the old Logger's context.
 //
 // The new Logger's handler is the result of calling WithGroup on the receiver's
 // handler.
 func (l *Logger) WithGroup(name string) *Logger {
-	return New(l.handler.WithGroup(name))
+	c := l.clone()
+	c.handler = l.handler.WithGroup(name)
+	return c
+
 }
 
-// WithContext returns a new Logger with the same handler
-// as the receiver and the given context.
-func (l *Logger) WithContext(ctx context.Context) *Logger {
-	l2 := *l
-	l2.ctx = ctx
-	return &l2
+// New creates a new Logger with the given non-nil Handler and a nil context.
+func New(h Handler) *Logger {
+	if h == nil {
+		panic("nil Handler")
+	}
+	return &Logger{handler: h}
 }
-
-// New creates a new Logger with the given Handler.
-func New(h Handler) *Logger { return &Logger{handler: h} }
 
 // With calls Logger.With on the default logger.
 func With(args ...any) *Logger {
 	return Default().With(args...)
 }
 
-// Enabled reports whether l emits log records at the given level.
-func (l *Logger) Enabled(level Level) bool {
-	return l.Handler().Enabled(level)
+// Enabled reports whether l emits log records at the given context and level.
+func (l *Logger) Enabled(ctx context.Context, level Level) bool {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return l.Handler().Enabled(ctx, level)
+}
+
+// NewLogLogger returns a new log.Logger such that each call to its Output method
+// dispatches a Record to the specified handler. The logger acts as a bridge from
+// the older log API to newer structured logging handlers.
+func NewLogLogger(h Handler, level Level) *log.Logger {
+	return log.New(&handlerWriter{h, level, true}, "", 0)
 }
 
 // Log emits a log record with the current time and the given level and message.
@@ -133,98 +153,191 @@ func (l *Logger) Enabled(level Level) bool {
 //     the following argument is treated as the value and the two are combined
 //     into an Attr.
 //   - Otherwise, the argument is treated as a value with key "!BADKEY".
-func (l *Logger) Log(level Level, msg string, args ...any) {
-	l.LogDepth(0, level, msg, args...)
-}
-
-// LogDepth is like [Logger.Log], but accepts a call depth to adjust the
-// file and line number in the log record. 0 refers to the caller
-// of LogDepth; 1 refers to the caller's caller; and so on.
-func (l *Logger) LogDepth(calldepth int, level Level, msg string, args ...any) {
-	if !l.Enabled(level) {
-		return
-	}
-	r := l.makeRecord(msg, level, calldepth)
-	r.setAttrsFromArgs(args)
-	_ = l.Handler().Handle(r)
-}
-
-func (l *Logger) makeRecord(msg string, level Level, depth int) Record {
-	return NewRecord(time.Now(), level, msg, depth+5, l.ctx)
+func (l *Logger) Log(ctx context.Context, level Level, msg string, args ...any) {
+	l.log(ctx, level, msg, args...)
 }
 
 // LogAttrs is a more efficient version of [Logger.Log] that accepts only Attrs.
-func (l *Logger) LogAttrs(level Level, msg string, attrs ...Attr) {
-	l.LogAttrsDepth(0, level, msg, attrs...)
+func (l *Logger) LogAttrs(ctx context.Context, level Level, msg string, attrs ...Attr) {
+	l.logAttrs(ctx, level, msg, attrs...)
 }
 
-// LogAttrsDepth is like [Logger.LogAttrs], but accepts a call depth argument
-// which it interprets like [Logger.LogDepth].
-func (l *Logger) LogAttrsDepth(calldepth int, level Level, msg string, attrs ...Attr) {
-	if !l.Enabled(level) {
+// Debug logs at LevelDebug.
+func (l *Logger) Debug(msg string, args ...any) {
+	l.log(nil, LevelDebug, msg, args...)
+}
+
+// DebugContext logs at LevelDebug with the given context.
+func (l *Logger) DebugContext(ctx context.Context, msg string, args ...any) {
+	l.log(ctx, LevelDebug, msg, args...)
+}
+
+// DebugCtx logs at LevelDebug with the given context.
+// Deprecated: Use Logger.DebugContext.
+func (l *Logger) DebugCtx(ctx context.Context, msg string, args ...any) {
+	l.log(ctx, LevelDebug, msg, args...)
+}
+
+// Info logs at LevelInfo.
+func (l *Logger) Info(msg string, args ...any) {
+	l.log(nil, LevelInfo, msg, args...)
+}
+
+// InfoContext logs at LevelInfo with the given context.
+func (l *Logger) InfoContext(ctx context.Context, msg string, args ...any) {
+	l.log(ctx, LevelInfo, msg, args...)
+}
+
+// InfoCtx logs at LevelInfo with the given context.
+// Deprecated: Use Logger.InfoContext.
+func (l *Logger) InfoCtx(ctx context.Context, msg string, args ...any) {
+	l.log(ctx, LevelInfo, msg, args...)
+}
+
+// Warn logs at LevelWarn.
+func (l *Logger) Warn(msg string, args ...any) {
+	l.log(nil, LevelWarn, msg, args...)
+}
+
+// WarnContext logs at LevelWarn with the given context.
+func (l *Logger) WarnContext(ctx context.Context, msg string, args ...any) {
+	l.log(ctx, LevelWarn, msg, args...)
+}
+
+// WarnCtx logs at LevelWarn with the given context.
+// Deprecated: Use Logger.WarnContext.
+func (l *Logger) WarnCtx(ctx context.Context, msg string, args ...any) {
+	l.log(ctx, LevelWarn, msg, args...)
+}
+
+// Error logs at LevelError.
+func (l *Logger) Error(msg string, args ...any) {
+	l.log(nil, LevelError, msg, args...)
+}
+
+// ErrorContext logs at LevelError with the given context.
+func (l *Logger) ErrorContext(ctx context.Context, msg string, args ...any) {
+	l.log(ctx, LevelError, msg, args...)
+}
+
+// ErrorCtx logs at LevelError with the given context.
+// Deprecated: Use Logger.ErrorContext.
+func (l *Logger) ErrorCtx(ctx context.Context, msg string, args ...any) {
+	l.log(ctx, LevelError, msg, args...)
+}
+
+// log is the low-level logging method for methods that take ...any.
+// It must always be called directly by an exported logging method
+// or function, because it uses a fixed call depth to obtain the pc.
+func (l *Logger) log(ctx context.Context, level Level, msg string, args ...any) {
+	if !l.Enabled(ctx, level) {
 		return
 	}
-	r := l.makeRecord(msg, level, calldepth)
-	r.AddAttrs(attrs...)
-	_ = l.Handler().Handle(r)
-}
-
-// Debug logs at DebugLevel.
-func (l *Logger) Debug(msg string, args ...any) {
-	l.LogDepth(0, DebugLevel, msg, args...)
-}
-
-// Info logs at InfoLevel.
-func (l *Logger) Info(msg string, args ...any) {
-	l.LogDepth(0, InfoLevel, msg, args...)
-}
-
-// Warn logs at WarnLevel.
-func (l *Logger) Warn(msg string, args ...any) {
-	l.LogDepth(0, WarnLevel, msg, args...)
-}
-
-// Error logs at ErrorLevel.
-// If err is non-nil, Error appends Any(ErrorKey, err)
-// to the list of attributes.
-func (l *Logger) Error(msg string, err error, args ...any) {
-	if err != nil {
-		// TODO: avoid the copy.
-		args = append(args[:len(args):len(args)], Any(ErrorKey, err))
+	var pc uintptr
+	if !internal.IgnorePC {
+		var pcs [1]uintptr
+		// skip [runtime.Callers, this function, this function's caller]
+		runtime.Callers(3, pcs[:])
+		pc = pcs[0]
 	}
-	l.LogDepth(0, ErrorLevel, msg, args...)
+	r := NewRecord(time.Now(), level, msg, pc)
+	r.Add(args...)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	_ = l.Handler().Handle(ctx, r)
+}
+
+// logAttrs is like [Logger.log], but for methods that take ...Attr.
+func (l *Logger) logAttrs(ctx context.Context, level Level, msg string, attrs ...Attr) {
+	if !l.Enabled(ctx, level) {
+		return
+	}
+	var pc uintptr
+	if !internal.IgnorePC {
+		var pcs [1]uintptr
+		// skip [runtime.Callers, this function, this function's caller]
+		runtime.Callers(3, pcs[:])
+		pc = pcs[0]
+	}
+	r := NewRecord(time.Now(), level, msg, pc)
+	r.AddAttrs(attrs...)
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	_ = l.Handler().Handle(ctx, r)
 }
 
 // Debug calls Logger.Debug on the default logger.
 func Debug(msg string, args ...any) {
-	Default().LogDepth(0, DebugLevel, msg, args...)
+	Default().log(nil, LevelDebug, msg, args...)
+}
+
+// DebugContext calls Logger.DebugContext on the default logger.
+func DebugContext(ctx context.Context, msg string, args ...any) {
+	Default().log(ctx, LevelDebug, msg, args...)
 }
 
 // Info calls Logger.Info on the default logger.
 func Info(msg string, args ...any) {
-	Default().LogDepth(0, InfoLevel, msg, args...)
+	Default().log(nil, LevelInfo, msg, args...)
+}
+
+// InfoContext calls Logger.InfoContext on the default logger.
+func InfoContext(ctx context.Context, msg string, args ...any) {
+	Default().log(ctx, LevelInfo, msg, args...)
 }
 
 // Warn calls Logger.Warn on the default logger.
 func Warn(msg string, args ...any) {
-	Default().LogDepth(0, WarnLevel, msg, args...)
+	Default().log(nil, LevelWarn, msg, args...)
+}
+
+// WarnContext calls Logger.WarnContext on the default logger.
+func WarnContext(ctx context.Context, msg string, args ...any) {
+	Default().log(ctx, LevelWarn, msg, args...)
 }
 
 // Error calls Logger.Error on the default logger.
-func Error(msg string, err error, args ...any) {
-	if err != nil {
-		// TODO: avoid the copy.
-		args = append(args[:len(args):len(args)], Any(ErrorKey, err))
-	}
-	Default().LogDepth(0, ErrorLevel, msg, args...)
+func Error(msg string, args ...any) {
+	Default().log(nil, LevelError, msg, args...)
+}
+
+// ErrorContext calls Logger.ErrorContext on the default logger.
+func ErrorContext(ctx context.Context, msg string, args ...any) {
+	Default().log(ctx, LevelError, msg, args...)
+}
+
+// DebugCtx calls Logger.DebugContext on the default logger.
+// Deprecated: call DebugContext.
+func DebugCtx(ctx context.Context, msg string, args ...any) {
+	Default().log(ctx, LevelDebug, msg, args...)
+}
+
+// InfoCtx calls Logger.InfoContext on the default logger.
+// Deprecated: call InfoContext.
+func InfoCtx(ctx context.Context, msg string, args ...any) {
+	Default().log(ctx, LevelInfo, msg, args...)
+}
+
+// WarnCtx calls Logger.WarnContext on the default logger.
+// Deprecated: call WarnContext.
+func WarnCtx(ctx context.Context, msg string, args ...any) {
+	Default().log(ctx, LevelWarn, msg, args...)
+}
+
+// ErrorCtx calls Logger.ErrorContext on the default logger.
+// Deprecated: call ErrorContext.
+func ErrorCtx(ctx context.Context, msg string, args ...any) {
+	Default().log(ctx, LevelError, msg, args...)
 }
 
 // Log calls Logger.Log on the default logger.
-func Log(level Level, msg string, args ...any) {
-	Default().LogDepth(0, level, msg, args...)
+func Log(ctx context.Context, level Level, msg string, args ...any) {
+	Default().log(ctx, level, msg, args...)
 }
 
 // LogAttrs calls Logger.LogAttrs on the default logger.
-func LogAttrs(level Level, msg string, attrs ...Attr) {
-	Default().LogAttrsDepth(0, level, msg, attrs...)
+func LogAttrs(ctx context.Context, level Level, msg string, attrs ...Attr) {
+	Default().logAttrs(ctx, level, msg, attrs...)
 }

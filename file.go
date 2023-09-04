@@ -21,7 +21,12 @@ import (
 // SaveStarred saves the starred repositories to a file.
 // It will append the new stars to the file.
 // The file will be created if it does not exist.
-func SaveStarred(ctx context.Context, client *github.Client, username string, perPage int) error {
+func SaveStarred(
+	ctx context.Context,
+	client *github.Client,
+	username string,
+	perPage int,
+) error {
 	filename := fmt.Sprintf("%s-stars.json", username)
 	slog.Info("starred repos stored", slog.String("filename", filename))
 
@@ -42,7 +47,7 @@ func SaveStarred(ctx context.Context, client *github.Client, username string, pe
 
 	opts := &github.ActivityListStarredOptions{
 		ListOptions: github.ListOptions{
-			Page:    resumePage(allStars, perPage),
+			Page:    resumePage(len(allStars), perPage),
 			PerPage: perPage,
 		},
 		// Sort:        "full_name", // created, updated, pushed, full_name (default).
@@ -56,7 +61,9 @@ func SaveStarred(ctx context.Context, client *github.Client, username string, pe
 		if err != nil {
 			var rle *github.RateLimitError
 			if ok := errors.As(err, &rle); ok {
-				slog.Info("rate limit exceeded", slog.Time("sleeping until", rle.Rate.Reset.Time))
+				slog.Info(
+					"rate limit exceeded",
+					slog.Time("sleeping until", rle.Rate.Reset.Time))
 				time.Sleep(time.Until(rle.Rate.Reset.Time))
 				continue
 			}
@@ -88,7 +95,10 @@ func SaveStarred(ctx context.Context, client *github.Client, username string, pe
 
 		cpt = cpt + len(stars)
 
-		slog.Info("starred repo", slog.Int("counter", cpt), slog.Int("quota remaining", resp.Rate.Remaining))
+		slog.Info(
+			"starred repo",
+			slog.Int("counter", cpt),
+			slog.Int("quota remaining", resp.Rate.Remaining))
 
 		if resp.NextPage == 0 {
 			break
@@ -99,18 +109,18 @@ func SaveStarred(ctx context.Context, client *github.Client, username string, pe
 	return nil
 }
 
-func resumePage(stars []*github.StarredRepository, perPage int) int {
-	if len(stars) == 0 {
+func resumePage(lenRepo, perPage int) int {
+	if lenRepo == 0 {
 		return 1
 	}
-	return len(stars)/perPage + 1
+	return lenRepo/perPage + 1
 }
 
 func resume(path string) ([]*github.StarredRepository, error) {
 	var stars []*github.StarredRepository
 
 	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
-	if errors.Is(err, os.ErrNotExist) {
+	if os.IsNotExist(err) {
 		f, err := os.Create(path)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create file %q: %w", path, err)

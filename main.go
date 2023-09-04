@@ -35,7 +35,7 @@ func main() {
 
 	log := makeLogger(slog.String("batchID", batchID))
 	if err := run(log); err != nil {
-		slog.Error("run", err)
+		slog.Error("run", "err", err)
 
 		os.Exit(exitCodeError)
 	}
@@ -45,10 +45,12 @@ func run(log *slog.Logger) error {
 	cfg := struct {
 		conf.Version
 		Username    string `conf:"default:veggiemonk,short:u,help:github username (default: veggiemonk)"`
+		Topic       string `conf:"help:if set, search and download only the repositories with this topic"`
 		SecretURL   string `conf:"short:s,mask,help:secret manager url"`
 		GithubToken string `conf:"short:t,mask,help:github token"`
 		ItemPerPage int    `conf:"default:10,short:i,help:github starred repo per page (default: 10)"`
 		Info        bool   `conf:"default:false,mask,help:show build info"`
+		Diff        bool   `conf:"default:false,mask,help:show diff"`
 	}{
 		Version: conf.Version{
 			Build: gitSha,
@@ -119,9 +121,63 @@ func run(log *slog.Logger) error {
 	ctx := context.Background()
 	client := gitHubClient(ctx, cfg.GithubToken)
 
+	if cfg.Diff {
+		log.Info("dedupe enabled")
+		gt, err := LoadRepos("golang-topic.json")
+		if err != nil {
+			return fmt.Errorf("load github topics: %w", err)
+		}
+		for i, r := range gt {
+			if r.Language == "Go" {
+				gt = append(gt[:i], gt[i+1:]...)
+			}
+		}
+		st, err := LoadRepos("veggiemonk.json")
+		if err != nil {
+			return fmt.Errorf("load veggiemonk starred: %w", err)
+		}
+		for i, r := range st {
+			if r.Language == "Go" {
+				st = append(st[:i], st[i+1:]...)
+			}
+		}
+		diff := Diff(gt, st)
+
+		for _, r := range diff {
+			fmt.Println(
+				r.StargazersCount,
+				" <> ",
+				r.FullName,
+				" - ",
+				r.Description)
+		}
+		return nil
+	}
+
+	if cfg.Topic != "" {
+		err = SaveTopic(
+			ctx,
+			client,
+			cfg.Topic,
+			1001,
+			100,
+		)
+		if err != nil {
+			slog.Error(
+				"topic repo",
+				slog.String("topic", cfg.Topic),
+				"err", err)
+			return nil
+		}
+		return nil
+	}
+
 	pageCount, err := getLastPage(ctx, client, cfg.Username, cfg.ItemPerPage)
 	if err != nil {
-		return fmt.Errorf("failed to get last page for %s: %w", cfg.Username, err)
+		return fmt.Errorf(
+			"failed to get last page for %s: %w",
+			cfg.Username,
+			err)
 	}
 
 	// see https://go.dev/play/p/fTzUGh2B3hq
@@ -135,9 +191,18 @@ func run(log *slog.Logger) error {
 		slog.Int("pageCount", pageCount),
 	)
 
-	_, err = getStarred(ctx, client, cfg.Username, cfg.ItemPerPage, pageStart, pageEnd)
+	_, err = getStarred(
+		ctx,
+		client,
+		cfg.Username,
+		cfg.ItemPerPage,
+		pageStart,
+		pageEnd)
 	if err != nil {
-		slog.Error("failed to get starred repo", err, slog.String("username", cfg.Username))
+		slog.Error(
+			"failed to get starred repo",
+			err,
+			slog.String("username", cfg.Username))
 		return nil
 	}
 

@@ -45,25 +45,34 @@ func GithubUser(ctx context.Context, client *github.Client, u string) {
 	fmt.Printf("\n%v\n", github.Stringify(user))
 }
 
-func getLastPage(ctx context.Context, client *github.Client, username string, itemPerPage int) (int, error) {
+func getLastPage(
+	ctx context.Context,
+	client *github.Client,
+	username string,
+	itemPerPage int,
+) (int, error) {
 	opts := &github.ActivityListStarredOptions{
 		ListOptions: github.ListOptions{
-			Page:    1,
+			Page:    0,
 			PerPage: itemPerPage,
 		},
 	}
 
 	_, resp, err := client.Activity.ListStarred(ctx, username, opts)
 	if err != nil {
-		return 0, fmt.Errorf("failed to query the list of starred repositories: %w", err)
+		return 0, fmt.Errorf(
+			"failed to query the list of starred repositories: %w",
+			err)
 	}
 	return resp.LastPage, nil
 }
 
-func getStarred(ctx context.Context, client *github.Client, username string, itemPerPage, pageStart, pageCount int) (
-	[]*Repo,
-	error,
-) {
+func getStarred(
+	ctx context.Context,
+	client *github.Client,
+	username string,
+	itemPerPage, pageStart, pageCount int,
+) ([]*Repo, error) {
 	opts := &github.ActivityListStarredOptions{
 		ListOptions: github.ListOptions{
 			Page:    pageStart,
@@ -77,7 +86,9 @@ func getStarred(ctx context.Context, client *github.Client, username string, ite
 		if err != nil {
 			var rle *github.RateLimitError
 			if ok := errors.As(err, &rle); ok {
-				slog.Info("rate limit exceeded", slog.Time("sleeping until", rle.Rate.Reset.Time))
+				slog.Info(
+					"rate limit exceeded",
+					slog.Time("sleeping until", rle.Rate.Reset.Time))
 				// TODO: check timezone
 				time.Sleep(time.Until(rle.Rate.Reset.Time))
 				continue
@@ -90,7 +101,9 @@ func getStarred(ctx context.Context, client *github.Client, username string, ite
 				time.Sleep(1 * time.Second)
 				continue
 			}
-			return nil, fmt.Errorf("failed to query the list of starred repositories: %w", err)
+			return nil, fmt.Errorf(
+				"failed to query the list of starred repositories: %w",
+				err)
 		}
 
 		for _, star := range stars {
@@ -102,7 +115,9 @@ func getStarred(ctx context.Context, client *github.Client, username string, ite
 			// Send to a channel to streamline the processing of the data
 			// here we just log it for simplicity
 			fmt.Printf("%s\n", b)
-			starred = append(starred, r) // not really needed but for the sake of the example
+			starred = append(
+				starred,
+				r) // not really needed but for the sake of the example
 		}
 
 		if resp.NextPage == 0 || resp.NextPage > pageCount {
